@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: spendwise_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: spendwise_auth
+      MYSQL_USER: spendwise
+      MYSQL_PASSWORD: spendwise123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - spendwise_network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: spendwise_mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - spendwise_network
+
+volumes:
+  mysql_data:
+
+networks:
+  spendwise_network:
+    driver: bridge
