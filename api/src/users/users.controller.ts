@@ -56,10 +56,10 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK) // ← Changé de NO_CONTENT à OK
   @ApiOperation({ summary: 'Delete a user' })
   @ApiParam({ name: 'id', description: 'User UUID' })
-  @ApiResponse({ status: 204, description: 'User successfully deleted' })
+  @ApiResponse({ status: 200, description: 'User successfully deleted' }) // ← 200 au lieu de 204
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
