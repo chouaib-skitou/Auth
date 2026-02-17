@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 
@@ -15,8 +17,8 @@ import appConfig from './config/app.config';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const dbConfig = configService.get('database');
+      useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
+        const dbConfig = configService.get<TypeOrmModuleOptions>('database');
         if (!dbConfig) {
           throw new Error('Database configuration is missing');
         }
@@ -24,6 +26,8 @@ import appConfig from './config/app.config';
       },
     }),
     UsersModule,
+    RolesModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
