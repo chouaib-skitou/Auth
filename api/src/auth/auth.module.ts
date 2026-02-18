@@ -6,13 +6,22 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from '../users/entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { MailModule } from '../mail/mail.module';
 import jwtConfig from '../config/jwt.config';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RefreshToken]),
-    JwtModule.register({}), // Empty config, we'll use ConfigService
+    TypeOrmModule.forFeature([
+      User,
+      RefreshToken,
+      EmailVerificationToken,
+      PasswordResetToken,
+    ]),
+    JwtModule.register({}),
     ConfigModule.forFeature(jwtConfig),
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService],

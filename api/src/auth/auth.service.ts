@@ -1,6 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +12,15 @@ import { User } from '../users/entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { MailService } from '../mail/mail.service';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -19,8 +29,13 @@ export class AuthService {
     private usersRepository: Repository<User>,
     @InjectRepository(RefreshToken)
     private refreshTokenRepository: Repository<RefreshToken>,
+    @InjectRepository(EmailVerificationToken)
+    private emailVerificationRepository: Repository<EmailVerificationToken>,
+    @InjectRepository(PasswordResetToken)
+    private passwordResetRepository: Repository<PasswordResetToken>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private mailService: MailService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
@@ -152,5 +167,156 @@ export class AuthService {
       default:
         return 900;
     }
+  }
+
+
+  async sendVerificationEmail(userId: string): Promise<void> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour
+
+    // Save token
+    await this.emailVerificationRepository.save({
+      token,
+      userId: user.id,
+      expiresAt,
+    });
+
+    // Send email
+    await this.mailService.sendVerificationEmail(user.email, token);
+  }
+
+  async verifyEmail(verifyEmailDto: VerifyEmailDto): Promise<{ message: string }> {
+    const tokenRecord = await this.emailVerificationRepository.findOne({
+      where: { token: verifyEmailDto.token, isUsed: false },
+      relations: ['user'],
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    if (new Date() > tokenRecord.expiresAt) {
+      throw new UnauthorizedException('Token expired');
+    }
+
+    // Mark user as verified
+    tokenRecord.user.isEmailVerified = true;
+    tokenRecord.user.emailVerifiedAt = new Date();
+    await this.usersRepository.save(tokenRecord.user);
+
+    // Mark token as used
+    tokenRecord.isUsed = true;
+    await this.emailVerificationRepository.save(tokenRecord);
+
+    return { message: 'Email verified successfully' };
+  }
+
+  async resendVerification(resendDto: ResendVerificationDto): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({
+      where: { email: resendDto.email },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return { message: 'If the email exists, verification email has been sent' };
+    }
+
+    if (user.isEmailVerified) {
+      throw new UnauthorizedException('Email already verified');
+    }
+
+    await this.sendVerificationEmail(user.id);
+
+    return { message: 'Verification email sent' };
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({
+      where: { email: forgotPasswordDto.email },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return { message: 'If the email exists, password reset email has been sent' };
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 20); // 20 minutes
+
+    // Save token
+    await this.passwordResetRepository.save({
+      token,
+      userId: user.id,
+      expiresAt,
+    });
+
+    // Send email
+    await this.mailService.sendPasswordResetEmail(user.email, token);
+
+    return { message: 'Password reset email sent' };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+    const tokenRecord = await this.passwordResetRepository.findOne({
+      where: { token: resetPasswordDto.token, isUsed: false },
+      relations: ['user'],
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    if (new Date() > tokenRecord.expiresAt) {
+      throw new UnauthorizedException('Token expired');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+
+    // Update password
+    tokenRecord.user.password = hashedPassword;
+    await this.usersRepository.save(tokenRecord.user);
+
+    // Mark token as used
+    tokenRecord.isUsed = true;
+    await this.passwordResetRepository.save(tokenRecord);
+
+    return { message: 'Password reset successfully' };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify old password
+    const isPasswordValid = await bcrypt.compare(
+      changePasswordDto.oldPassword,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid current password');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
+
+    // Update password
+    user.password = hashedPassword;
+    await this.usersRepository.save(user);
+
+    return { message: 'Password changed successfully' };
   }
 }
