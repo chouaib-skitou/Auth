@@ -11,6 +11,9 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { Get, Res } from '@nestjs/common';
 import { Response } from 'express';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
+import { User } from '../users/entities/user.entity';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -20,7 +23,11 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
-  @ApiResponse({ status: 200, description: 'Login successful', type: AuthResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    type: AuthResponseDto,
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(loginDto);
@@ -109,5 +116,22 @@ export class AuthController {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     // Redirect to frontend with token so user can enter new password
     res.redirect(`${frontendUrl}/reset-password?token=${token}`);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard) // ← Protect route
+  @ApiBearerAuth() // ← Show lock icon in Swagger
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'Current user info' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getProfile(@CurrentUser() user: User): Promise<any> {
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      isEmailVerified: user.isEmailVerified,
+      roles: user.roles?.map(r => r.name) || [],
+      permissions: user.roles?.flatMap(r => r.permissions?.map(p => p.name)) || [],
+    };
   }
 }

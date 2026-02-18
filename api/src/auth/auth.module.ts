@@ -10,6 +10,8 @@ import { EmailVerificationToken } from './entities/email-verification-token.enti
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MailModule } from '../mail/mail.module';
 import jwtConfig from '../config/jwt.config';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
@@ -20,11 +22,12 @@ import jwtConfig from '../config/jwt.config';
       PasswordResetToken,
     ]),
     JwtModule.register({}),
+    PassportModule,
     ConfigModule.forFeature(jwtConfig),
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}
