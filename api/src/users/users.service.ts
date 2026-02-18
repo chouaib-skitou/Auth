@@ -9,15 +9,18 @@ import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private authService: AuthService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
+    // Check if username exists
     const existingUsername = await this.usersRepository.findOne({
       where: { username: createUserDto.username },
     });
@@ -25,6 +28,7 @@ export class UsersService {
       throw new ConflictException('Username already exists');
     }
 
+    // Check if email exists
     const existingEmail = await this.usersRepository.findOne({
       where: { email: createUserDto.email },
     });
@@ -32,13 +36,21 @@ export class UsersService {
       throw new ConflictException('Email already exists');
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+
+    // Create user
     const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
     });
 
-    return this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(user);
+
+    // Send verification email
+    await this.authService.sendVerificationEmail(savedUser.id);
+
+    return savedUser;
   }
 
   async findAll(): Promise<User[]> {

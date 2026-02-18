@@ -9,6 +9,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { Get, Res } from '@nestjs/common';
+import { Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -72,9 +74,40 @@ export class AuthController {
   @ApiOperation({ summary: 'Change password (authenticated user)' })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 401, description: 'Invalid current password' })
-  async changePassword(@Body() changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
+  async changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
     // TODO: Add JWT guard and get user ID from token
     const userId = 'temp'; // This will be replaced with actual user ID from JWT
     return this.authService.changePassword(userId, changePasswordDto);
+  }
+
+  @Get('verify-email/:token')
+  @ApiOperation({ summary: 'Verify email via link (redirects to frontend)' })
+  async verifyEmailViaLink(
+    @Param('token') token: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      await this.authService.verifyEmail({ token });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${frontendUrl}/login?verified=true`);
+    } catch (error) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(
+        `${frontendUrl}/login?verified=false&error=${encodeURIComponent(error.message)}`,
+      );
+    }
+  }
+
+  @Get('reset-password/:token')
+  @ApiOperation({ summary: 'Password reset via link (redirects to frontend)' })
+  resetPasswordViaLink(
+    @Param('token') token: string,
+    @Res() res: Response,
+  ): void {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // Redirect to frontend with token so user can enter new password
+    res.redirect(`${frontendUrl}/reset-password?token=${token}`);
   }
 }
