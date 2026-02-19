@@ -101,8 +101,6 @@ export class UsersController {
     @Param('userId') userId: string,
     @Param('roleName') roleName: string,
   ) {
-    // TODO: Implement role assignment logic
-    // return this.usersService.assignRole(userId, roleName);
-    return 0;
+    return this.usersService.assignRole(userId, roleName);
   }
 }
