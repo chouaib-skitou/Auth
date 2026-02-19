@@ -7,6 +7,7 @@ import {
   ManyToMany,
   JoinTable,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '../../roles/entities/role.entity';
 
@@ -25,6 +26,7 @@ export class User {
   email: string;
 
   @Column({ length: 255 })
+  @Exclude()
   password: string;
 
   @ApiProperty({ description: 'Email verification status' })
