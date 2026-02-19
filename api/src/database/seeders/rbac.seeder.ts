@@ -6,6 +6,7 @@ export async function seedRBAC(dataSource: DataSource): Promise<void> {
   const permissionRepo = dataSource.getRepository(Permission);
   const roleRepo = dataSource.getRepository(Role);
 
+  // Create permissions
   const permissionsData = [
     { name: 'READ_USERS', description: 'Can view users' },
     { name: 'CREATE_USERS', description: 'Can create users' },
@@ -21,38 +22,82 @@ export async function seedRBAC(dataSource: DataSource): Promise<void> {
   const savedPermissions: Permission[] = [];
 
   for (const perm of permissionsData) {
-    const existing = await permissionRepo.findOne({ where: { name: perm.name } });
+    const existing = await permissionRepo.findOne({
+      where: { name: perm.name },
+    });
+
     if (!existing) {
       const newPerm = permissionRepo.create(perm);
       const saved = await permissionRepo.save(newPerm);
       savedPermissions.push(saved);
-      console.log('Created permission: ' + perm.name);
+      console.log(`✅ Created permission: ${perm.name}`);
     } else {
       savedPermissions.push(existing);
-      console.log('Permission exists: ' + perm.name);
+      console.log(`⏭️  Permission exists: ${perm.name}`);
     }
   }
 
+  // Helper function
   const getPermsByNames = (names: string[]): Permission[] => {
     return savedPermissions.filter((perm) => names.includes(perm.name));
   };
 
+  // Create roles
   const rolesConfig = [
-    { name: 'ADMIN', description: 'Administrator with full access', permissionNames: permissionsData.map((p) => p.name) },
-    { name: 'MANAGER', description: 'Manager with team management rights', permissionNames: ['READ_USERS', 'CREATE_USERS', 'MANAGE_TEAM', 'VIEW_REPORTS', 'READ_OWN_DATA', 'UPDATE_OWN_DATA'] },
-    { name: 'ACCOUNTANT', description: 'Accountant with financial access', permissionNames: ['MANAGE_FINANCES', 'VIEW_REPORTS', 'READ_OWN_DATA', 'UPDATE_OWN_DATA'] },
-    { name: 'SUPPORT', description: 'Support team member', permissionNames: ['READ_USERS', 'READ_OWN_DATA'] },
-    { name: 'USER', description: 'Regular user', permissionNames: ['READ_OWN_DATA', 'UPDATE_OWN_DATA'] },
+    {
+      name: 'ADMIN',
+      description: 'Administrator with full access',
+      permissionNames: permissionsData.map((p) => p.name),
+    },
+    {
+      name: 'MANAGER',
+      description: 'Manager with team management rights',
+      permissionNames: [
+        'READ_USERS',
+        'CREATE_USERS',
+        'MANAGE_TEAM',
+        'VIEW_REPORTS',
+        'READ_OWN_DATA',
+        'UPDATE_OWN_DATA',
+      ],
+    },
+    {
+      name: 'ACCOUNTANT',
+      description: 'Accountant with financial access',
+      permissionNames: [
+        'MANAGE_FINANCES',
+        'VIEW_REPORTS',
+        'READ_OWN_DATA',
+        'UPDATE_OWN_DATA',
+      ],
+    },
+    {
+      name: 'SUPPORT',
+      description: 'Support team member',
+      permissionNames: ['READ_USERS', 'READ_OWN_DATA'],
+    },
+    {
+      name: 'USER',
+      description: 'Regular user',
+      permissionNames: ['READ_OWN_DATA', 'UPDATE_OWN_DATA'],
+    },
   ];
 
   for (const config of rolesConfig) {
     const existing = await roleRepo.findOne({ where: { name: config.name } });
+
     if (!existing) {
-      const role = roleRepo.create({ name: config.name, description: config.description, permissions: getPermsByNames(config.permissionNames) });
+      const role = roleRepo.create({
+        name: config.name,
+        description: config.description,
+        permissions: getPermsByNames(config.permissionNames),
+      });
       await roleRepo.save(role);
-      console.log('Created role: ' + config.name + ' with ' + config.permissionNames.length + ' permissions');
+      console.log(
+        `✅ Created role: ${config.name} with ${config.permissionNames.length} permissions`,
+      );
     } else {
-      console.log('Role exists: ' + config.name);
+      console.log(`⏭️  Role exists: ${config.name}`);
     }
   }
 }
