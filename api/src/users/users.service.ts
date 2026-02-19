@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -59,7 +60,15 @@ export class UsersService {
     return users.map(user => this.mapToResponse(user));
   }
 
-  async findOne(id: string): Promise<UserResponseDto> {
+  async findOne(id: string, currentUser: User): Promise<UserResponseDto> {
+    // Check if user is trying to access someone else's profile
+    const userRoles = currentUser.roles?.map(r => r.name) || [];
+    const isAdminOrManager = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
+
+    if (!isAdminOrManager && currentUser.id !== id) {
+      throw new ForbiddenException('You can only view your own profile');
+    }
+
     const user = await this.usersRepository.findOne({
       where: { id },
       relations: ['roles', 'roles.permissions'],
@@ -73,11 +82,43 @@ export class UsersService {
     return this.mapToResponse(user);
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
+  async update(id: string, updateUserDto: UpdateUserDto, currentUser: User): Promise<User> {
+    const userRoles = currentUser.roles?.map(r => r.name) || [];
+    const isAdminOrManager = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
+
+    // Check if user is trying to update someone else
+    if (!isAdminOrManager && currentUser.id !== id) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+
+    const user = await this.usersRepository.findOne({ 
+      where: { id },
+      relations: ['roles'],
+    });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // MANAGER cannot update other MANAGERs or ADMINs
+    if (userRoles.includes('MANAGER') && !userRoles.includes('ADMIN')) {
+      const targetUserRoles = user.roles?.map(r => r.name) || [];
+      const targetIsManagerOrAdmin = targetUserRoles.includes('MANAGER') || targetUserRoles.includes('ADMIN');
+      
+      if (targetIsManagerOrAdmin && currentUser.id !== id) {
+        throw new ForbiddenException('Managers cannot update other managers or admins');
+      }
+    }
+
+    // Regular users can only update username and email
+    if (!isAdminOrManager) {
+      const allowedFields = ['username', 'email'];
+      const updateFields = Object.keys(updateUserDto);
+      const hasInvalidFields = updateFields.some(field => !allowedFields.includes(field));
+      
+      if (hasInvalidFields) {
+        throw new ForbiddenException('You can only update username and email');
+      }
     }
 
     if (updateUserDto.username && updateUserDto.username !== user.username) {
@@ -106,11 +147,29 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
-  async remove(id: string): Promise<{ message: string }> {
-    const user = await this.usersRepository.findOne({ where: { id } });
+  async remove(id: string, currentUser: User): Promise<{ message: string }> {
+    const userRoles = currentUser.roles?.map(r => r.name) || [];
+    const isAdmin = userRoles.includes('ADMIN');
+
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      relations: ['roles'],
+    });
+
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
+
+    // MANAGER cannot delete other MANAGERs or ADMINs
+    if (userRoles.includes('MANAGER') && !isAdmin) {
+      const targetUserRoles = user.roles?.map(r => r.name) || [];
+      const targetIsManagerOrAdmin = targetUserRoles.includes('MANAGER') || targetUserRoles.includes('ADMIN');
+      
+      if (targetIsManagerOrAdmin) {
+        throw new ForbiddenException('Managers cannot delete other managers or admins');
+      }
+    }
+
     await this.usersRepository.remove(user);
     return { message: `User with ID ${id} successfully deleted` };
   }

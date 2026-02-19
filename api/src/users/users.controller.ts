@@ -23,6 +23,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from './entities/user.entity';
+import { UserResponseDto } from './dto/user-response.dto';
+
 
 @ApiTags('users')
 @Controller('users')
@@ -35,7 +39,7 @@ export class UsersController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Create a new user' })
-   @ApiResponse({ status: 201, description: 'User successfully created' })
+  @ApiResponse({ status: 201, description: 'User successfully created' })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -55,12 +59,18 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a user by ID' })
   @ApiParam({ name: 'id', description: 'User UUID' })
-  @ApiResponse({ status: 200, description: 'User found' })
+  @ApiResponse({
+    status: 200,
+    description: 'User found',
+    type: UserResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  findOne(@Param('id') id: string) {
-    // TODO: Add logic - USER can only see their own profile
-    return this.usersService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: User,
+  ): Promise<UserResponseDto> {
+    return this.usersService.findOne(id, currentUser);
   }
 
   @Patch(':id')
@@ -70,9 +80,12 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    // TODO: Add logic - USER can only update themselves
-    return this.usersService.update(id, updateUserDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.usersService.update(id, updateUserDto, currentUser);
   }
 
   @Delete(':id')
@@ -83,8 +96,8 @@ export class UsersController {
   @ApiResponse({ status: 204, description: 'User successfully deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() currentUser: User) {
+    return this.usersService.remove(id, currentUser);
   }
 
   @Post(':userId/roles/:roleName')
