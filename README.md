@@ -52,8 +52,8 @@ A production-ready, reusable authentication and authorization system built with 
 ### 1. Clone & Install
 
 ```bash
-git clone <repository-url>
-cd auth-system/api
+git clone https://github.com/chouaib-skitou/Auth
+cd auth/api
 pnpm install
 ```
 
