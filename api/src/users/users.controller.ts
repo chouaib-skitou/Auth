@@ -26,25 +26,28 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('users')
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Create a new user' })
-  @ApiResponse({ status: 201, description: 'User successfully created' })
+   @ApiResponse({ status: 201, description: 'User successfully created' })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
   @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'MANAGER') // ← Only ADMIN or MANAGER can access
-  @ApiBearerAuth()
+  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Get all users' })
   @ApiResponse({ status: 200, description: 'List of all users' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   findAll() {
     return this.usersService.findAll();
   }
@@ -54,7 +57,9 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiResponse({ status: 200, description: 'User found' })
   @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   findOne(@Param('id') id: string) {
+    // TODO: Add logic - USER can only see their own profile
     return this.usersService.findOne(id);
   }
 
@@ -64,17 +69,40 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User successfully updated' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    // TODO: Add logic - USER can only update themselves
     return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.OK) // ← Changé de NO_CONTENT à OK
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Delete a user' })
   @ApiParam({ name: 'id', description: 'User UUID' })
-  @ApiResponse({ status: 200, description: 'User successfully deleted' }) // ← 200 au lieu de 204
+  @ApiResponse({ status: 204, description: 'User successfully deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Post(':userId/roles/:roleName')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Assign role to user' })
+  @ApiParam({ name: 'userId', description: 'User UUID' })
+  @ApiParam({
+    name: 'roleName',
+    description: 'Role name (ADMIN, MANAGER, USER, etc.)',
+  })
+  @ApiResponse({ status: 200, description: 'Role assigned successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  assignRole(
+    @Param('userId') userId: string,
+    @Param('roleName') roleName: string,
+  ) {
+    // TODO: Implement role assignment logic
+    // return this.usersService.assignRole(userId, roleName);
+    return 0;
   }
 }
