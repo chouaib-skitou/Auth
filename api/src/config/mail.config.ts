@@ -5,6 +5,6 @@ export default registerAs('mail', () => ({
   port: parseInt(process.env.MAIL_PORT || '1025', 10),
   user: process.env.MAIL_USER || '',
   password: process.env.MAIL_PASSWORD || '',
-  from: process.env.MAIL_FROM || 'noreply@spendwise.com',
+  from: process.env.MAIL_FROM || 'onboarding@resend.dev',
   fromName: process.env.MAIL_FROM_NAME || 'SpendWise',
 }));
