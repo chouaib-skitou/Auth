@@ -140,7 +140,8 @@ export class UsersService {
     if (!isAdminOrManager) {
       const allowedFields = ['username', 'email'];
       const updateFields = Object.keys(updateUserDto);
-      const hasInvalidFields = updateFields.some(field => !allowedFields.includes(field));
+      const hasInvalidFields = updateFields.some(
+        (field) => !allowedFields.includes(field), // ← Fixed: removed extra )
       );
 
       if (hasInvalidFields) {
@@ -201,7 +202,11 @@ export class UsersService {
     return { message: `User with ID ${id} successfully deleted` };
   }
 
-  async assignRole(userId: string, roleName: string): Promise<User> {
+  async assignRole(
+    userId: string,
+    roleName: string,
+    currentUser: User, // ← Add this parameter
+  ): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       relations: ['roles'],
@@ -220,15 +225,33 @@ export class UsersService {
       throw new NotFoundException(`Role ${roleName} not found`);
     }
 
+    // Check if current user is MANAGER trying to assign MANAGER or ADMIN role
+    const currentUserRoles = currentUser.roles?.map((r) => r.name) || [];
+    const isAdmin = currentUserRoles.includes('ADMIN');
+
+    // Only ADMIN can assign ADMIN or MANAGER roles
+    if (!isAdmin && (roleName === 'ADMIN' || roleName === 'MANAGER')) {
+      throw new ForbiddenException(
+        'Only administrators can assign ADMIN or MANAGER roles',
+      );
+    }
+
+    // Prevent users from assigning roles to themselves (except ADMIN)
+    if (!isAdmin && currentUser.id === userId) {
+      throw new ForbiddenException('You cannot assign roles to yourself');
+    }
+
     if (!user.roles) {
       user.roles = [];
     }
 
     const hasRole = user.roles.some((r) => r.id === role.id);
-    if (!hasRole) {
-      user.roles.push(role);
-      await this.usersRepository.save(user);
+    if (hasRole) {
+      throw new ConflictException(`User already has the ${roleName} role`);
     }
+
+    user.roles.push(role);
+    await this.usersRepository.save(user);
 
     const updatedUser = await this.usersRepository.findOne({
       where: { id: userId },
