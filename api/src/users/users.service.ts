@@ -22,7 +22,10 @@ export class UsersService {
     private authService: AuthService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(
+    createUserDto: CreateUserDto,
+    currentUser?: User,
+  ): Promise<User> {
     const existingUsername = await this.usersRepository.findOne({
       where: { username: createUserDto.username },
     });
@@ -54,7 +57,14 @@ export class UsersService {
   async findAll(): Promise<UserResponseDto[]> {
     const users = await this.usersRepository.find({
       relations: ['roles', 'roles.permissions'],
-      select: ['id', 'username', 'email', 'isEmailVerified', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'username',
+        'email',
+        'isEmailVerified',
+        'createdAt',
+        'updatedAt',
+      ],
     });
 
     return users.map(user => this.mapToResponse(user));
@@ -72,7 +82,15 @@ export class UsersService {
     const user = await this.usersRepository.findOne({
       where: { id },
       relations: ['roles', 'roles.permissions'],
-      select: ['id', 'username', 'email', 'isEmailVerified', 'emailVerifiedAt', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'username',
+        'email',
+        'isEmailVerified',
+        'emailVerifiedAt',
+        'createdAt',
+        'updatedAt',
+      ],
     });
 
     if (!user) {
@@ -82,7 +100,11 @@ export class UsersService {
     return this.mapToResponse(user);
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto, currentUser: User): Promise<User> {
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+    currentUser: User,
+  ): Promise<User> {
     const userRoles = currentUser.roles?.map(r => r.name) || [];
     const isAdminOrManager = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
 
@@ -102,11 +124,15 @@ export class UsersService {
 
     // MANAGER cannot update other MANAGERs or ADMINs
     if (userRoles.includes('MANAGER') && !userRoles.includes('ADMIN')) {
-      const targetUserRoles = user.roles?.map(r => r.name) || [];
-      const targetIsManagerOrAdmin = targetUserRoles.includes('MANAGER') || targetUserRoles.includes('ADMIN');
-      
+      const targetUserRoles = user.roles?.map((r) => r.name) || [];
+      const targetIsManagerOrAdmin =
+        targetUserRoles.includes('MANAGER') ||
+        targetUserRoles.includes('ADMIN');
+
       if (targetIsManagerOrAdmin && currentUser.id !== id) {
-        throw new ForbiddenException('Managers cannot update other managers or admins');
+        throw new ForbiddenException(
+          'Managers cannot update other managers or admins',
+        );
       }
     }
 
@@ -115,7 +141,8 @@ export class UsersService {
       const allowedFields = ['username', 'email'];
       const updateFields = Object.keys(updateUserDto);
       const hasInvalidFields = updateFields.some(field => !allowedFields.includes(field));
-      
+      );
+
       if (hasInvalidFields) {
         throw new ForbiddenException('You can only update username and email');
       }
