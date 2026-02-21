@@ -133,11 +133,16 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'Role assigned successfully' })
   @ApiResponse({ status: 404, description: 'User or role not found' })
-  @ApiResponse({ status: 403, description: 'Forbidden - ADMIN only' })
+  @ApiResponse({ status: 409, description: 'User already has this role' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Cannot assign ADMIN/MANAGER roles',
+  })
   assignRole(
     @Param('userId') userId: string,
     @Param('roleName') roleName: string,
+    @CurrentUser() currentUser: User,
   ) {
-    return this.usersService.assignRole(userId, roleName);
+    return this.usersService.assignRole(userId, roleName, currentUser);
   }
 }
