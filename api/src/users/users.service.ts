@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +14,7 @@ import { UserResponseDto } from './dto/user-response.dto';
 import { Role } from '../roles/entities/role.entity';
 import { AuthService } from '../auth/auth.service';
 import * as bcrypt from 'bcrypt';
+import { EmailValidationService } from '../mail/email-validation.service';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +22,7 @@ export class UsersService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private authService: AuthService,
+    private emailValidationService: EmailValidationService,
   ) {}
 
   async create(
@@ -38,6 +41,28 @@ export class UsersService {
     });
     if (existingEmail) {
       throw new ConflictException('Email already exists');
+    }
+
+    const validationEnabled = process.env.EMAIL_VALIDATION_ENABLED === 'true';
+    
+    if (validationEnabled) {
+      const emailCheck = await this.emailValidationService.validateEmail(
+        createUserDto.email,
+      );
+
+      if (this.emailValidationService.shouldBlock(emailCheck)) {
+        throw new BadRequestException(
+          `Invalid email: ${emailCheck.reason}`,
+        );
+      }
+
+      // Suggest correction if typo detected
+      const suggestion = this.emailValidationService.getSuggestion(emailCheck);
+      if (suggestion) {
+        throw new BadRequestException(
+          `Did you mean: ${suggestion}?`,
+        );
+      }
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
