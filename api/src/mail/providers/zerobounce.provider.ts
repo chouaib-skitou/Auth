@@ -1,39 +1,46 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IEmailValidator, EmailValidationResult } from '../interfaces/email-validator.interface';
-import * as zerobounceSdk from '@zerobounce/zero-bounce-sdk';
 
 @Injectable()
 export class ZeroBounceProvider implements IEmailValidator {
   private readonly logger = new Logger(ZeroBounceProvider.name);
-  private initialized = false;
+  private apiKey: string | null = null;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('emailValidation.zeroBounceApiKey');
-    if (apiKey) {
-      zerobounceSdk.init(apiKey);
-      this.initialized = true;
+    this.apiKey = this.configService.get<string>('emailValidation.zeroBounceApiKey') || null;
+    
+    if (this.apiKey) {
       this.logger.log('ZeroBounce provider initialized');
     } else {
-      this.logger.warn('ZeroBounce API key not configured');
+      this.logger.warn('ZeroBounce API key not configured - provider disabled');
     }
   }
 
   async validate(email: string): Promise<EmailValidationResult> {
-    if (!this.initialized) {
-      throw new Error('ZeroBounce provider not initialized');
+    if (!this.apiKey) {
+      throw new Error('ZeroBounce provider not configured');
     }
 
     try {
-      const response = await zerobounceSdk.validate(email);
+      // Make HTTP request to ZeroBounce API
+      const response = await fetch(
+        `https://api.zerobounce.net/v2/validate?api_key=${this.apiKey}&email=${encodeURIComponent(email)}`,
+      );
+
+      if (!response.ok) {
+        throw new Error(`ZeroBounce API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
 
       return {
-        valid: response.status === 'valid',
-        reason: this.mapStatus(response.status),
-        suggestion: response.did_you_mean || undefined,
-        isDisposable: response.sub_status === 'disposable',
-        isCatchAll: response.sub_status === 'catch_all',
-        score: this.calculateScore(response),
+        valid: data.status === 'valid',
+        reason: this.mapStatus(data.status),
+        suggestion: data.did_you_mean || undefined,
+        isDisposable: data.sub_status === 'disposable',
+        isCatchAll: data.sub_status === 'catch_all',
+        score: this.calculateScore(data),
       };
     } catch (error) {
       this.logger.error(`ZeroBounce validation error: ${error.message}`);
@@ -54,10 +61,10 @@ export class ZeroBounceProvider implements IEmailValidator {
     return statusMap[status] || 'Unknown status';
   }
 
-  private calculateScore(response: any): number {
-    if (response.status === 'valid') return 100;
-    if (response.status === 'catch_all') return 70;
-    if (response.status === 'unknown') return 50;
+  private calculateScore(data: any): number {
+    if (data.status === 'valid') return 100;
+    if (data.status === 'catch_all') return 70;
+    if (data.status === 'unknown') return 50;
     return 0;
   }
 }
