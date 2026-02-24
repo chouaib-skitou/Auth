@@ -52,8 +52,8 @@ A production-ready, reusable authentication and authorization system built with 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/chouaib-skitou/Auth
-cd auth/api
+git clone https://github.com/chouaib-skitou/nest-auth-starter
+cd nest-auth-starter/api
 pnpm install
 ```
 
