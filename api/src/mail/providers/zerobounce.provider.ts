@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IEmailValidator, EmailValidationResult } from '../interfaces/email-validator.interface';
+import {
+  IEmailValidator,
+  EmailValidationResult,
+} from '../interfaces/email-validator.interface';
 
 @Injectable()
 export class ZeroBounceProvider implements IEmailValidator {
@@ -9,16 +12,21 @@ export class ZeroBounceProvider implements IEmailValidator {
   private readonly apiUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('emailValidation.zeroBounce.apiKey') || null;
+    this.apiKey =
+      this.configService.get<string>('emailValidation.zeroBounce.apiKey') ||
+      null;
     this.apiUrl = this.configService.get<string>(
       'emailValidation.zeroBounce.apiUrl',
-      'https://api.zerobounce.net/v2',
-    );
-    
+    )!;
+
     if (this.apiKey) {
-      this.logger.log(`ZeroBounce provider initialized with API: ${this.apiUrl}`);
+      this.logger.log(
+        `ZeroBounce provider initialized with API: ${this.apiUrl}`,
+      );
     } else {
-      this.logger.warn('ZeroBounce API key not configured - provider disabled');
+      this.logger.warn(
+        'ZeroBounce API key not configured - provider disabled',
+      );
     }
   }
 
@@ -28,9 +36,7 @@ export class ZeroBounceProvider implements IEmailValidator {
     }
 
     try {
-      // Use configurable API URL
       const url = `${this.apiUrl}/validate?api_key=${this.apiKey}&email=${encodeURIComponent(email)}`;
-      
       const response = await fetch(url);
 
       if (!response.ok) {
