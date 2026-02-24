@@ -14,21 +14,24 @@ export class MailService {
       password: this.configService.get<string>('mail.password', ''),
     };
 
-    console.log('📧 Mail Config:', { 
-      host: mailConfig.host, 
+    console.log('📧 Mail Config:', {
+      host: mailConfig.host,
       port: mailConfig.port,
       user: mailConfig.user,
-      hasPassword: !!mailConfig.password 
+      hasPassword: !!mailConfig.password,
     });
 
     this.transporter = nodemailer.createTransport({
       host: mailConfig.host,
       port: mailConfig.port,
       secure: false, // Use STARTTLS
-      auth: mailConfig.user && mailConfig.password ? {
-        user: mailConfig.user,
-        pass: mailConfig.password,
-      } : undefined,
+      auth:
+        mailConfig.user && mailConfig.password
+          ? {
+              user: mailConfig.user,
+              pass: mailConfig.password,
+            }
+          : undefined,
       tls: {
         rejectUnauthorized: false,
       },
@@ -36,7 +39,10 @@ export class MailService {
   }
 
   async sendVerificationEmail(email: string, token: string): Promise<void> {
-    const apiUrl = this.configService.get<string>('app.apiUrl', 'http://localhost:3000');
+    const apiUrl = this.configService.get<string>(
+      'app.apiUrl',
+      'http://localhost:3000',
+    );
     const verificationUrl = `${apiUrl}/auth/verify-email/${token}`;
 
     await this.transporter.sendMail({
@@ -60,7 +66,10 @@ export class MailService {
   }
 
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
-    const apiUrl = this.configService.get<string>('app.apiUrl', 'http://localhost:3000');
+    const apiUrl = this.configService.get<string>(
+      'app.apiUrl',
+      'http://localhost:3000',
+    );
     const resetUrl = `${apiUrl}/auth/reset-password/${token}`;
 
     await this.transporter.sendMail({

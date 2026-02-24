@@ -14,22 +14,20 @@ export class PermissionsGuard implements CanActivate {
     );
 
     if (!requiredPermissions) {
-      return true; // No permissions required
+      return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<{ user: User }>();
     const user: User = request.user;
 
     if (!user || !user.roles) {
       return false;
     }
 
-    // Get all permissions from all user roles
     const userPermissions = user.roles.flatMap(
       (role) => role.permissions?.map((perm) => perm.name) || [],
     );
 
-    // Check if user has at least one of the required permissions
     return requiredPermissions.some((permission) =>
       userPermissions.includes(permission),
     );

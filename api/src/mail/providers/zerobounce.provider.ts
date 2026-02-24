@@ -5,6 +5,12 @@ import {
   EmailValidationResult,
 } from '../interfaces/email-validator.interface';
 
+interface ZeroBounceResponse {
+  status: string;
+  sub_status?: string;
+  did_you_mean?: string;
+}
+
 @Injectable()
 export class ZeroBounceProvider implements IEmailValidator {
   private readonly logger = new Logger(ZeroBounceProvider.name);
@@ -24,9 +30,7 @@ export class ZeroBounceProvider implements IEmailValidator {
         `ZeroBounce provider initialized with API: ${this.apiUrl}`,
       );
     } else {
-      this.logger.warn(
-        'ZeroBounce API key not configured - provider disabled',
-      );
+      this.logger.warn('ZeroBounce API key not configured - provider disabled');
     }
   }
 
@@ -43,7 +47,7 @@ export class ZeroBounceProvider implements IEmailValidator {
         throw new Error(`ZeroBounce API error: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as ZeroBounceResponse;
 
       return {
         valid: data.status === 'valid',
@@ -54,7 +58,9 @@ export class ZeroBounceProvider implements IEmailValidator {
         score: this.calculateScore(data),
       };
     } catch (error) {
-      this.logger.error(`ZeroBounce validation error: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`ZeroBounce validation error: ${errorMessage}`);
       throw error;
     }
   }
@@ -72,7 +78,7 @@ export class ZeroBounceProvider implements IEmailValidator {
     return statusMap[status] || 'Unknown status';
   }
 
-  private calculateScore(data: any): number {
+  private calculateScore(data: ZeroBounceResponse): number {
     if (data.status === 'valid') return 100;
     if (data.status === 'catch_all') return 70;
     if (data.status === 'unknown') return 50;

@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IEmailValidator, EmailValidationResult } from '../interfaces/email-validator.interface';
+import {
+  IEmailValidator,
+  EmailValidationResult,
+} from '../interfaces/email-validator.interface';
 import { validate } from 'deep-email-validator';
 
 @Injectable()
@@ -24,7 +27,9 @@ export class DeepValidatorProvider implements IEmailValidator {
         score: result.valid ? 80 : 0,
       };
     } catch (error) {
-      this.logger.error(`Deep validator error: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Deep validator error: ${errorMessage}`);
       throw error;
     }
   }

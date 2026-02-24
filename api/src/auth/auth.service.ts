@@ -59,20 +59,21 @@ export class AuthService {
 
     // Block login if email not verified
     if (!user.isEmailVerified) {
-      throw new UnauthorizedException('Please verify your email before logging in');
+      throw new UnauthorizedException(
+        'Please verify your email before logging in',
+      );
     }
 
     return this.generateTokens(user);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponseDto> {
-    let payload: any;
     try {
       const refreshSecret = this.configService.get<string>('jwt.refreshSecret');
       if (!refreshSecret) {
         throw new Error('Refresh secret not configured');
       }
-      payload = this.jwtService.verify(refreshToken, {
+      this.jwtService.verify(refreshToken, {
         secret: refreshSecret,
       });
     } catch {
@@ -115,8 +116,10 @@ export class AuthService {
 
     const accessSecret = this.configService.get<string>('jwt.accessSecret');
     const refreshSecret = this.configService.get<string>('jwt.refreshSecret');
-    const accessExpiration = this.configService.get<string>('jwt.accessExpiration') || '15m';
-    const refreshExpiration = this.configService.get<string>('jwt.refreshExpiration') || '7d';
+    const accessExpiration =
+      this.configService.get<string>('jwt.accessExpiration') || '15m';
+    const refreshExpiration =
+      this.configService.get<string>('jwt.refreshExpiration') || '7d';
 
     if (!accessSecret || !refreshSecret) {
       throw new Error('JWT secrets not configured');
@@ -174,7 +177,6 @@ export class AuthService {
     }
   }
 
-
   async sendVerificationEmail(userId: string): Promise<void> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -197,7 +199,9 @@ export class AuthService {
     await this.mailService.sendVerificationEmail(user.email, token);
   }
 
-  async verifyEmail(verifyEmailDto: VerifyEmailDto): Promise<{ message: string }> {
+  async verifyEmail(
+    verifyEmailDto: VerifyEmailDto,
+  ): Promise<{ message: string }> {
     const tokenRecord = await this.emailVerificationRepository.findOne({
       where: { token: verifyEmailDto.token, isUsed: false },
       relations: ['user'],
@@ -223,14 +227,18 @@ export class AuthService {
     return { message: 'Email verified successfully' };
   }
 
-  async resendVerification(resendDto: ResendVerificationDto): Promise<{ message: string }> {
+  async resendVerification(
+    resendDto: ResendVerificationDto,
+  ): Promise<{ message: string }> {
     const user = await this.usersRepository.findOne({
       where: { email: resendDto.email },
     });
 
     if (!user) {
       // Don't reveal if user exists
-      return { message: 'If the email exists, verification email has been sent' };
+      return {
+        message: 'If the email exists, verification email has been sent',
+      };
     }
 
     if (user.isEmailVerified) {
@@ -242,14 +250,18 @@ export class AuthService {
     return { message: 'Verification email sent' };
   }
 
-  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
+  async forgotPassword(
+    forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
     const user = await this.usersRepository.findOne({
       where: { email: forgotPasswordDto.email },
     });
 
     if (!user) {
       // Don't reveal if user exists
-      return { message: 'If the email exists, password reset email has been sent' };
+      return {
+        message: 'If the email exists, password reset email has been sent',
+      };
     }
 
     // Generate token
@@ -270,7 +282,9 @@ export class AuthService {
     return { message: 'Password reset email sent' };
   }
 
-  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+  async resetPassword(
+    resetPasswordDto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
     const tokenRecord = await this.passwordResetRepository.findOne({
       where: { token: resetPasswordDto.token, isUsed: false },
       relations: ['user'],
@@ -298,7 +312,10 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
-  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<{ message: string }> {
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
 
     if (!user) {

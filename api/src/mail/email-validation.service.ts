@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IEmailValidator, EmailValidationResult } from './interfaces/email-validator.interface';
+import {
+  IEmailValidator,
+  EmailValidationResult,
+} from './interfaces/email-validator.interface';
 import { ZeroBounceProvider } from './providers/zerobounce.provider';
 import { DeepValidatorProvider } from './providers/deep-validator.provider';
 
@@ -26,7 +29,7 @@ export class EmailValidationService {
 
   private getProvider(providerName: string): IEmailValidator {
     const providers: Record<string, IEmailValidator> = {
-      'zerobounce': this.zeroBounceProvider,
+      zerobounce: this.zeroBounceProvider,
       'deep-validator': this.deepValidatorProvider,
     };
 
@@ -37,9 +40,10 @@ export class EmailValidationService {
     try {
       return await this.provider.validate(email);
     } catch (error) {
-      this.logger.error(`Email validation failed: ${error.message}`);
-      
-      // Fallback to basic validation if provider fails
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Email validation failed: ${errorMessage}`);
+
       return {
         valid: this.isValidFormat(email),
         reason: 'Provider unavailable, basic validation only',

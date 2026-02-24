@@ -25,10 +25,7 @@ export class UsersService {
     private emailValidationService: EmailValidationService,
   ) {}
 
-  async create(
-    createUserDto: CreateUserDto,
-    currentUser?: User,
-  ): Promise<User> {
+  async create(createUserDto: CreateUserDto): Promise<User> {
     const existingUsername = await this.usersRepository.findOne({
       where: { username: createUserDto.username },
     });
@@ -44,24 +41,20 @@ export class UsersService {
     }
 
     const validationEnabled = process.env.EMAIL_VALIDATION_ENABLED === 'true';
-    
+
     if (validationEnabled) {
       const emailCheck = await this.emailValidationService.validateEmail(
         createUserDto.email,
       );
 
       if (this.emailValidationService.shouldBlock(emailCheck)) {
-        throw new BadRequestException(
-          `Invalid email: ${emailCheck.reason}`,
-        );
+        throw new BadRequestException(`Invalid email: ${emailCheck.reason}`);
       }
 
       // Suggest correction if typo detected
       const suggestion = this.emailValidationService.getSuggestion(emailCheck);
       if (suggestion) {
-        throw new BadRequestException(
-          `Did you mean: ${suggestion}?`,
-        );
+        throw new BadRequestException(`Did you mean: ${suggestion}?`);
       }
     }
 
@@ -92,13 +85,14 @@ export class UsersService {
       ],
     });
 
-    return users.map(user => this.mapToResponse(user));
+    return users.map((user) => this.mapToResponse(user));
   }
 
   async findOne(id: string, currentUser: User): Promise<UserResponseDto> {
     // Check if user is trying to access someone else's profile
-    const userRoles = currentUser.roles?.map(r => r.name) || [];
-    const isAdminOrManager = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
+    const userRoles = currentUser.roles?.map((r) => r.name) || [];
+    const isAdminOrManager =
+      userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
 
     if (!isAdminOrManager && currentUser.id !== id) {
       throw new ForbiddenException('You can only view your own profile');
@@ -130,15 +124,16 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     currentUser: User,
   ): Promise<User> {
-    const userRoles = currentUser.roles?.map(r => r.name) || [];
-    const isAdminOrManager = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
+    const userRoles = currentUser.roles?.map((r) => r.name) || [];
+    const isAdminOrManager =
+      userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
 
     // Check if user is trying to update someone else
     if (!isAdminOrManager && currentUser.id !== id) {
       throw new ForbiddenException('You can only update your own profile');
     }
 
-    const user = await this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({
       where: { id },
       relations: ['roles'],
     });
@@ -201,7 +196,7 @@ export class UsersService {
   }
 
   async remove(id: string, currentUser: User): Promise<{ message: string }> {
-    const userRoles = currentUser.roles?.map(r => r.name) || [];
+    const userRoles = currentUser.roles?.map((r) => r.name) || [];
     const isAdmin = userRoles.includes('ADMIN');
 
     const user = await this.usersRepository.findOne({
@@ -215,11 +210,15 @@ export class UsersService {
 
     // MANAGER cannot delete other MANAGERs or ADMINs
     if (userRoles.includes('MANAGER') && !isAdmin) {
-      const targetUserRoles = user.roles?.map(r => r.name) || [];
-      const targetIsManagerOrAdmin = targetUserRoles.includes('MANAGER') || targetUserRoles.includes('ADMIN');
-      
+      const targetUserRoles = user.roles?.map((r) => r.name) || [];
+      const targetIsManagerOrAdmin =
+        targetUserRoles.includes('MANAGER') ||
+        targetUserRoles.includes('ADMIN');
+
       if (targetIsManagerOrAdmin) {
-        throw new ForbiddenException('Managers cannot delete other managers or admins');
+        throw new ForbiddenException(
+          'Managers cannot delete other managers or admins',
+        );
       }
     }
 
@@ -299,8 +298,9 @@ export class UsersService {
       emailVerifiedAt: user.emailVerifiedAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      roles: user.roles?.map(r => r.name) || [],
-      permissions: user.roles?.flatMap(r => r.permissions?.map(p => p.name)) || [],
+      roles: user.roles?.map((r) => r.name) || [],
+      permissions:
+        user.roles?.flatMap((r) => r.permissions?.map((p) => p.name)) || [],
     };
   }
 }
