@@ -5,13 +5,18 @@ import { IEmailValidator, EmailValidationResult } from '../interfaces/email-vali
 @Injectable()
 export class ZeroBounceProvider implements IEmailValidator {
   private readonly logger = new Logger(ZeroBounceProvider.name);
-  private apiKey: string | null = null;
+  private readonly apiKey: string | null;
+  private readonly apiUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('emailValidation.zeroBounceApiKey') || null;
+    this.apiKey = this.configService.get<string>('emailValidation.zeroBounce.apiKey') || null;
+    this.apiUrl = this.configService.get<string>(
+      'emailValidation.zeroBounce.apiUrl',
+      'https://api.zerobounce.net/v2',
+    );
     
     if (this.apiKey) {
-      this.logger.log('ZeroBounce provider initialized');
+      this.logger.log(`ZeroBounce provider initialized with API: ${this.apiUrl}`);
     } else {
       this.logger.warn('ZeroBounce API key not configured - provider disabled');
     }
@@ -23,10 +28,10 @@ export class ZeroBounceProvider implements IEmailValidator {
     }
 
     try {
-      // Make HTTP request to ZeroBounce API
-      const response = await fetch(
-        `https://api.zerobounce.net/v2/validate?api_key=${this.apiKey}&email=${encodeURIComponent(email)}`,
-      );
+      // Use configurable API URL
+      const url = `${this.apiUrl}/validate?api_key=${this.apiKey}&email=${encodeURIComponent(email)}`;
+      
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(`ZeroBounce API error: ${response.statusText}`);
