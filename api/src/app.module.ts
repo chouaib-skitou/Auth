@@ -7,7 +7,6 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { AuthModule } from './auth/auth.module';
-import { MailService } from './mail/mail.service';
 import { MailModule } from './mail/mail.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
@@ -35,6 +34,6 @@ import appConfig from './config/app.config';
     MailModule,
   ],
   controllers: [AppController],
-  providers: [AppService, MailService],
+  providers: [AppService],
 })
 export class AppModule {}
