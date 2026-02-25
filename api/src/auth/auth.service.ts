@@ -22,6 +22,11 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import * as crypto from 'crypto';
 
+const BCRYPT_ROUNDS = 10;
+const TOKEN_BYTES = 32;
+const EMAIL_VERIFICATION_HOURS = 1;
+const PASSWORD_RESET_MINUTES = 20;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -57,7 +62,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Block login if email not verified
     if (!user.isEmailVerified) {
       throw new UnauthorizedException(
         'Please verify your email before logging in',
@@ -125,7 +129,6 @@ export class AuthService {
       throw new Error('JWT secrets not configured');
     }
 
-    // Convert expiration strings to seconds
     const accessExpiresIn = this.parseExpirationToSeconds(accessExpiration);
     const refreshExpiresIn = this.parseExpirationToSeconds(refreshExpiration);
 
@@ -143,7 +146,9 @@ export class AuthService {
     );
 
     const refreshTokenExpiration = new Date();
-    refreshTokenExpiration.setDate(refreshTokenExpiration.getDate() + 7);
+    refreshTokenExpiration.setSeconds(
+      refreshTokenExpiration.getSeconds() + refreshExpiresIn,
+    );
 
     await this.refreshTokenRepository.save({
       token: refreshToken,
@@ -183,19 +188,16 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    // Generate token
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(TOKEN_BYTES).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour
+    expiresAt.setHours(expiresAt.getHours() + EMAIL_VERIFICATION_HOURS);
 
-    // Save token
     await this.emailVerificationRepository.save({
       token,
       userId: user.id,
       expiresAt,
     });
 
-    // Send email
     await this.mailService.sendVerificationEmail(user.email, token);
   }
 
@@ -215,12 +217,10 @@ export class AuthService {
       throw new UnauthorizedException('Token expired');
     }
 
-    // Mark user as verified
     tokenRecord.user.isEmailVerified = true;
     tokenRecord.user.emailVerifiedAt = new Date();
     await this.usersRepository.save(tokenRecord.user);
 
-    // Mark token as used
     tokenRecord.isUsed = true;
     await this.emailVerificationRepository.save(tokenRecord);
 
@@ -235,7 +235,6 @@ export class AuthService {
     });
 
     if (!user) {
-      // Don't reveal if user exists
       return {
         message: 'If the email exists, verification email has been sent',
       };
@@ -258,25 +257,21 @@ export class AuthService {
     });
 
     if (!user) {
-      // Don't reveal if user exists
       return {
         message: 'If the email exists, password reset email has been sent',
       };
     }
 
-    // Generate token
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(TOKEN_BYTES).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 20); // 20 minutes
+    expiresAt.setMinutes(expiresAt.getMinutes() + PASSWORD_RESET_MINUTES);
 
-    // Save token
     await this.passwordResetRepository.save({
       token,
       userId: user.id,
       expiresAt,
     });
 
-    // Send email
     await this.mailService.sendPasswordResetEmail(user.email, token);
 
     return { message: 'Password reset email sent' };
@@ -298,14 +293,14 @@ export class AuthService {
       throw new UnauthorizedException('Token expired');
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(
+      resetPasswordDto.newPassword,
+      BCRYPT_ROUNDS,
+    );
 
-    // Update password
     tokenRecord.user.password = hashedPassword;
     await this.usersRepository.save(tokenRecord.user);
 
-    // Mark token as used
     tokenRecord.isUsed = true;
     await this.passwordResetRepository.save(tokenRecord);
 
@@ -322,7 +317,6 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    // Verify old password
     const isPasswordValid = await bcrypt.compare(
       changePasswordDto.oldPassword,
       user.password,
@@ -332,10 +326,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid current password');
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      BCRYPT_ROUNDS,
+    );
 
-    // Update password
     user.password = hashedPassword;
     await this.usersRepository.save(user);
 

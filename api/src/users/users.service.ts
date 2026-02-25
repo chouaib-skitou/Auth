@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -16,6 +17,10 @@ import { AuthService } from '../auth/auth.service';
 import * as bcrypt from 'bcrypt';
 import { EmailValidationService } from '../mail/email-validation.service';
 
+const ADMIN_ROLE = 'ADMIN';
+const MANAGER_ROLE = 'MANAGER';
+const BCRYPT_ROUNDS = 10;
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -23,7 +28,27 @@ export class UsersService {
     private usersRepository: Repository<User>,
     private authService: AuthService,
     private emailValidationService: EmailValidationService,
+    private configService: ConfigService,
   ) {}
+
+  private isAdmin(user: User): boolean {
+    return user.roles?.some((r) => r.name === ADMIN_ROLE) ?? false;
+  }
+
+  private isAdminOrManager(user: User): boolean {
+    return (
+      user.roles?.some((r) => [ADMIN_ROLE, MANAGER_ROLE].includes(r.name)) ??
+      false
+    );
+  }
+
+  private isTargetAdminOrManager(targetUser: User): boolean {
+    return (
+      targetUser.roles?.some((r) =>
+        [ADMIN_ROLE, MANAGER_ROLE].includes(r.name),
+      ) ?? false
+    );
+  }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     const existingUsername = await this.usersRepository.findOne({
@@ -40,7 +65,10 @@ export class UsersService {
       throw new ConflictException('Email already exists');
     }
 
-    const validationEnabled = process.env.EMAIL_VALIDATION_ENABLED === 'true';
+    const validationEnabled = this.configService.get<boolean>(
+      'emailValidation.enabled',
+      false,
+    );
 
     if (validationEnabled) {
       const emailCheck = await this.emailValidationService.validateEmail(
@@ -51,14 +79,16 @@ export class UsersService {
         throw new BadRequestException(`Invalid email: ${emailCheck.reason}`);
       }
 
-      // Suggest correction if typo detected
       const suggestion = this.emailValidationService.getSuggestion(emailCheck);
       if (suggestion) {
         throw new BadRequestException(`Did you mean: ${suggestion}?`);
       }
     }
 
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const hashedPassword = await bcrypt.hash(
+      createUserDto.password,
+      BCRYPT_ROUNDS,
+    );
 
     const user = this.usersRepository.create({
       ...createUserDto,
@@ -89,12 +119,7 @@ export class UsersService {
   }
 
   async findOne(id: string, currentUser: User): Promise<UserResponseDto> {
-    // Check if user is trying to access someone else's profile
-    const userRoles = currentUser.roles?.map((r) => r.name) || [];
-    const isAdminOrManager =
-      userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
-
-    if (!isAdminOrManager && currentUser.id !== id) {
+    if (!this.isAdminOrManager(currentUser) && currentUser.id !== id) {
       throw new ForbiddenException('You can only view your own profile');
     }
 
@@ -124,12 +149,7 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     currentUser: User,
   ): Promise<User> {
-    const userRoles = currentUser.roles?.map((r) => r.name) || [];
-    const isAdminOrManager =
-      userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
-
-    // Check if user is trying to update someone else
-    if (!isAdminOrManager && currentUser.id !== id) {
+    if (!this.isAdminOrManager(currentUser) && currentUser.id !== id) {
       throw new ForbiddenException('You can only update your own profile');
     }
 
@@ -142,26 +162,19 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // MANAGER cannot update other MANAGERs or ADMINs
-    if (userRoles.includes('MANAGER') && !userRoles.includes('ADMIN')) {
-      const targetUserRoles = user.roles?.map((r) => r.name) || [];
-      const targetIsManagerOrAdmin =
-        targetUserRoles.includes('MANAGER') ||
-        targetUserRoles.includes('ADMIN');
-
-      if (targetIsManagerOrAdmin && currentUser.id !== id) {
+    if (!this.isAdmin(currentUser) && this.isAdminOrManager(currentUser)) {
+      if (this.isTargetAdminOrManager(user) && currentUser.id !== id) {
         throw new ForbiddenException(
           'Managers cannot update other managers or admins',
         );
       }
     }
 
-    // Regular users can only update username and email
-    if (!isAdminOrManager) {
+    if (!this.isAdminOrManager(currentUser)) {
       const allowedFields = ['username', 'email'];
       const updateFields = Object.keys(updateUserDto);
       const hasInvalidFields = updateFields.some(
-        (field) => !allowedFields.includes(field), // ← Fixed: removed extra )
+        (field) => !allowedFields.includes(field),
       );
 
       if (hasInvalidFields) {
@@ -188,7 +201,10 @@ export class UsersService {
     }
 
     if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+      updateUserDto.password = await bcrypt.hash(
+        updateUserDto.password,
+        BCRYPT_ROUNDS,
+      );
     }
 
     Object.assign(user, updateUserDto);
@@ -196,9 +212,6 @@ export class UsersService {
   }
 
   async remove(id: string, currentUser: User): Promise<{ message: string }> {
-    const userRoles = currentUser.roles?.map((r) => r.name) || [];
-    const isAdmin = userRoles.includes('ADMIN');
-
     const user = await this.usersRepository.findOne({
       where: { id },
       relations: ['roles'],
@@ -208,14 +221,8 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // MANAGER cannot delete other MANAGERs or ADMINs
-    if (userRoles.includes('MANAGER') && !isAdmin) {
-      const targetUserRoles = user.roles?.map((r) => r.name) || [];
-      const targetIsManagerOrAdmin =
-        targetUserRoles.includes('MANAGER') ||
-        targetUserRoles.includes('ADMIN');
-
-      if (targetIsManagerOrAdmin) {
+    if (!this.isAdmin(currentUser) && this.isAdminOrManager(currentUser)) {
+      if (this.isTargetAdminOrManager(user)) {
         throw new ForbiddenException(
           'Managers cannot delete other managers or admins',
         );
@@ -229,64 +236,56 @@ export class UsersService {
   async assignRole(
     userId: string,
     roleName: string,
-    currentUser: User, // ← Add this parameter
+    currentUser: User,
   ): Promise<User> {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: ['roles'],
-    });
+    return await this.usersRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        const user = await transactionalEntityManager.findOne(User, {
+          where: { id: userId },
+          relations: ['roles', 'roles.permissions'],
+        });
 
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
+        if (!user) {
+          throw new NotFoundException(`User with ID ${userId} not found`);
+        }
 
-    const role = await this.usersRepository.manager.findOne(Role, {
-      where: { name: roleName },
-      relations: ['permissions'],
-    });
+        const role = await transactionalEntityManager.findOne(Role, {
+          where: { name: roleName },
+          relations: ['permissions'],
+        });
 
-    if (!role) {
-      throw new NotFoundException(`Role ${roleName} not found`);
-    }
+        if (!role) {
+          throw new NotFoundException(`Role ${roleName} not found`);
+        }
 
-    // Check if current user is MANAGER trying to assign MANAGER or ADMIN role
-    const currentUserRoles = currentUser.roles?.map((r) => r.name) || [];
-    const isAdmin = currentUserRoles.includes('ADMIN');
+        if (
+          !this.isAdmin(currentUser) &&
+          (roleName === ADMIN_ROLE || roleName === MANAGER_ROLE)
+        ) {
+          throw new ForbiddenException(
+            'Only administrators can assign ADMIN or MANAGER roles',
+          );
+        }
 
-    // Only ADMIN can assign ADMIN or MANAGER roles
-    if (!isAdmin && (roleName === 'ADMIN' || roleName === 'MANAGER')) {
-      throw new ForbiddenException(
-        'Only administrators can assign ADMIN or MANAGER roles',
-      );
-    }
+        if (!this.isAdmin(currentUser) && currentUser.id === userId) {
+          throw new ForbiddenException('You cannot assign roles to yourself');
+        }
 
-    // Prevent users from assigning roles to themselves (except ADMIN)
-    if (!isAdmin && currentUser.id === userId) {
-      throw new ForbiddenException('You cannot assign roles to yourself');
-    }
+        if (!user.roles) {
+          user.roles = [];
+        }
 
-    if (!user.roles) {
-      user.roles = [];
-    }
+        const hasRole = user.roles.some((r) => r.id === role.id);
+        if (hasRole) {
+          throw new ConflictException(`User already has the ${roleName} role`);
+        }
 
-    const hasRole = user.roles.some((r) => r.id === role.id);
-    if (hasRole) {
-      throw new ConflictException(`User already has the ${roleName} role`);
-    }
+        user.roles.push(role);
 
-    user.roles.push(role);
-    await this.usersRepository.save(user);
-
-    const updatedUser = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: ['roles', 'roles.permissions'],
-    });
-
-    if (!updatedUser) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
-
-    return updatedUser;
+        const savedUser = await transactionalEntityManager.save(User, user);
+        return savedUser;
+      },
+    );
   }
 
   private mapToResponse(user: User): UserResponseDto {
