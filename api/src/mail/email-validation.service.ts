@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isEmail } from 'class-validator';
 import {
   IEmailValidator,
   EmailValidationResult,
@@ -17,7 +18,6 @@ export class EmailValidationService {
     private zeroBounceProvider: ZeroBounceProvider,
     private deepValidatorProvider: DeepValidatorProvider,
   ) {
-    // Choose provider based on config
     const providerName = this.configService.get<string>(
       'emailValidation.provider',
       'deep-validator',
@@ -52,16 +52,13 @@ export class EmailValidationService {
   }
 
   private isValidFormat(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return isEmail(email);
   }
 
-  // Helper method for typo suggestions
   getSuggestion(result: EmailValidationResult): string | null {
     return result.suggestion || null;
   }
 
-  // Helper method to check if should block
   shouldBlock(result: EmailValidationResult): boolean {
     return !result.valid || result.isDisposable === true;
   }
