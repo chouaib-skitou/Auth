@@ -22,11 +22,6 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import * as crypto from 'crypto';
 
-const BCRYPT_ROUNDS = 10;
-const TOKEN_BYTES = 32;
-const EMAIL_VERIFICATION_HOURS = 1;
-const PASSWORD_RESET_MINUTES = 20;
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -178,7 +173,7 @@ export class AuthService {
       case 'd':
         return value * 60 * 60 * 24;
       default:
-        return 900;
+        return 900; // 15 minutes default
     }
   }
 
@@ -188,9 +183,18 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    const token = crypto.randomBytes(TOKEN_BYTES).toString('hex');
+    const tokenBytes = this.configService.get<number>(
+      'security.tokenBytes',
+      32,
+    );
+    const expirationHours = this.configService.get<number>(
+      'security.emailVerificationHours',
+      1,
+    );
+
+    const token = crypto.randomBytes(tokenBytes).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + EMAIL_VERIFICATION_HOURS);
+    expiresAt.setHours(expiresAt.getHours() + expirationHours);
 
     await this.emailVerificationRepository.save({
       token,
@@ -262,9 +266,18 @@ export class AuthService {
       };
     }
 
-    const token = crypto.randomBytes(TOKEN_BYTES).toString('hex');
+    const tokenBytes = this.configService.get<number>(
+      'security.tokenBytes',
+      32,
+    );
+    const expirationMinutes = this.configService.get<number>(
+      'security.passwordResetMinutes',
+      20,
+    );
+
+    const token = crypto.randomBytes(tokenBytes).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + PASSWORD_RESET_MINUTES);
+    expiresAt.setMinutes(expiresAt.getMinutes() + expirationMinutes);
 
     await this.passwordResetRepository.save({
       token,
@@ -293,9 +306,13 @@ export class AuthService {
       throw new UnauthorizedException('Token expired');
     }
 
+    const bcryptRounds = this.configService.get<number>(
+      'security.bcryptRounds',
+      10,
+    );
     const hashedPassword = await bcrypt.hash(
       resetPasswordDto.newPassword,
-      BCRYPT_ROUNDS,
+      bcryptRounds,
     );
 
     tokenRecord.user.password = hashedPassword;
@@ -326,9 +343,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid current password');
     }
 
+    const bcryptRounds = this.configService.get<number>(
+      'security.bcryptRounds',
+      10,
+    );
     const hashedPassword = await bcrypt.hash(
       changePasswordDto.newPassword,
-      BCRYPT_ROUNDS,
+      bcryptRounds,
     );
 
     user.password = hashedPassword;

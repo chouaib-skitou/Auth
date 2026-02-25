@@ -10,12 +10,13 @@ import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
+import securityConfig from './config/security.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, appConfig],
+      load: [databaseConfig, appConfig, securityConfig], // ✅ Added security config
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],

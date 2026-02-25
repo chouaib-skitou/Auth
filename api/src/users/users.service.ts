@@ -16,10 +16,7 @@ import { Role } from '../roles/entities/role.entity';
 import { AuthService } from '../auth/auth.service';
 import * as bcrypt from 'bcrypt';
 import { EmailValidationService } from '../mail/email-validation.service';
-
-const ADMIN_ROLE = 'ADMIN';
-const MANAGER_ROLE = 'MANAGER';
-const BCRYPT_ROUNDS = 10;
+import { RoleName } from '../roles/constants/role.constants';
 
 @Injectable()
 export class UsersService {
@@ -32,20 +29,21 @@ export class UsersService {
   ) {}
 
   private isAdmin(user: User): boolean {
-    return user.roles?.some((r) => r.name === ADMIN_ROLE) ?? false;
+    return user.roles?.some((r) => r.name === RoleName.ADMIN) ?? false;
   }
 
   private isAdminOrManager(user: User): boolean {
     return (
-      user.roles?.some((r) => [ADMIN_ROLE, MANAGER_ROLE].includes(r.name)) ??
-      false
+      user.roles?.some(
+        (r) => r.name === RoleName.ADMIN || r.name === RoleName.MANAGER,
+      ) ?? false
     );
   }
 
   private isTargetAdminOrManager(targetUser: User): boolean {
     return (
-      targetUser.roles?.some((r) =>
-        [ADMIN_ROLE, MANAGER_ROLE].includes(r.name),
+      targetUser.roles?.some(
+        (r) => r.name === RoleName.ADMIN || r.name === RoleName.MANAGER,
       ) ?? false
     );
   }
@@ -85,9 +83,13 @@ export class UsersService {
       }
     }
 
+    const bcryptRounds = this.configService.get<number>(
+      'security.bcryptRounds',
+      10,
+    );
     const hashedPassword = await bcrypt.hash(
       createUserDto.password,
-      BCRYPT_ROUNDS,
+      bcryptRounds,
     );
 
     const user = this.usersRepository.create({
@@ -201,9 +203,13 @@ export class UsersService {
     }
 
     if (updateUserDto.password) {
+      const bcryptRounds = this.configService.get<number>(
+        'security.bcryptRounds',
+        10,
+      );
       updateUserDto.password = await bcrypt.hash(
         updateUserDto.password,
-        BCRYPT_ROUNDS,
+        bcryptRounds,
       );
     }
 
@@ -260,7 +266,7 @@ export class UsersService {
 
         if (
           !this.isAdmin(currentUser) &&
-          (roleName === ADMIN_ROLE || roleName === MANAGER_ROLE)
+          (roleName === RoleName.ADMIN || roleName === RoleName.MANAGER)
         ) {
           throw new ForbiddenException(
             'Only administrators can assign ADMIN or MANAGER roles',
