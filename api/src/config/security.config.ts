@@ -11,4 +11,9 @@ export default registerAs('security', () => ({
     process.env.PASSWORD_RESET_MINUTES || '20',
     10,
   ),
+  maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5', 10),
+  lockoutDurationMinutes: parseInt(
+    process.env.LOCKOUT_DURATION_MINUTES || '30',
+    10,
+  ),
 }));
