@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -27,12 +27,24 @@ import { AccountLockoutListener } from './account-lockout.listener';
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.accessSecret'),
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.accessExpiration'),
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('jwt.accessSecret');
+        const expiresIn = configService.get<string>('jwt.accessExpiration');
+        
+        if (!secret) {
+          throw new Error('JWT access secret is not configured');
+        }
+        
+        const signOptions: JwtSignOptions = {};
+        if (expiresIn) {
+          signOptions.expiresIn = expiresIn;
+        }
+        
+        return {
+          secret,
+          signOptions,
+        };
+      },
     }),
     MailModule,
   ],

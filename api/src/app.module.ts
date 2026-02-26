@@ -36,8 +36,8 @@ import throttlerConfig from './config/throttler.config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => [
         {
-          ttl: configService.get<number>('throttler.ttl'),
-          limit: configService.get<number>('throttler.limit'),
+          ttl: configService.get<number>('throttler.ttl') ?? 60000,
+          limit: configService.get<number>('throttler.limit') ?? 20,
         },
       ],
     }),

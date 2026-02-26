@@ -121,7 +121,7 @@ export class AccountLockoutService {
         await transactionalEntityManager.update(User, userId, {
           failedLoginAttempts: 0,
           isLocked: false,
-          lockedUntil: null,
+          lockedUntil: undefined,
         });
       },
     );
@@ -172,7 +172,7 @@ export class AccountLockoutService {
     await this.usersRepository.update(userId, {
       failedLoginAttempts: 0,
       isLocked: false,
-      lockedUntil: null,
+      lockedUntil: undefined,
     });
 
     this.eventEmitter.emit('account.unlocked', { userId });

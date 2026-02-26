@@ -38,6 +38,19 @@ export class MailService {
     });
   }
 
+  private async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+  ): Promise<void> {
+    await this.transporter.sendMail({
+      from: `"${this.configService.get<string>('mail.fromName', 'Auth System')}" <${this.configService.get<string>('mail.from', 'noreply@yourdomain.com')}>`,
+      to,
+      subject,
+      html,
+    });
+  }
+
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     const apiUrl = this.configService.get<string>(
       'app.apiUrl',
@@ -100,21 +113,23 @@ export class MailService {
   ): Promise<void> {
     const subject = 'Security Alert: Account Locked';
     const html = `
-      <h2>Account Temporarily Locked</h2>
-      <p>Hello ${username},</p>
-      <p>Your account has been temporarily locked due to multiple failed login attempts.</p>
-      
-      <h3>Details:</h3>
-      <ul>
-        <li><strong>IP Address:</strong> ${ipAddress}</li>
-        <li><strong>Lock Duration:</strong> ${durationMinutes} minutes</li>
-        <li><strong>Unlock Time:</strong> ${new Date(Date.now() + durationMinutes * 60000).toLocaleString()}</li>
-      </ul>
-      
-      <p><strong>If this wasn't you:</strong> Please contact support immediately.</p>
-      <p>Your account will automatically unlock in ${durationMinutes} minutes.</p>
-      
-      <p>Best regards,<br>Security Team</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #d32f2f;">Account Temporarily Locked</h2>
+        <p>Hello ${username},</p>
+        <p>Your account has been temporarily locked due to multiple failed login attempts.</p>
+        
+        <h3>Details:</h3>
+        <ul>
+          <li><strong>IP Address:</strong> ${ipAddress}</li>
+          <li><strong>Lock Duration:</strong> ${durationMinutes} minutes</li>
+          <li><strong>Unlock Time:</strong> ${new Date(Date.now() + durationMinutes * 60000).toLocaleString()}</li>
+        </ul>
+        
+        <p><strong>If this wasn't you:</strong> Please contact support immediately.</p>
+        <p>Your account will automatically unlock in ${durationMinutes} minutes.</p>
+        
+        <p style="color: #666; font-size: 14px;">Best regards,<br>Security Team</p>
+      </div>
     `;
 
     await this.sendEmail(email, subject, html);
