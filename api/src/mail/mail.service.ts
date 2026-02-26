@@ -91,4 +91,32 @@ export class MailService {
       `,
     });
   }
+
+  async sendAccountLockedEmail(
+    email: string,
+    username: string,
+    durationMinutes: number,
+    ipAddress: string,
+  ): Promise<void> {
+    const subject = 'Security Alert: Account Locked';
+    const html = `
+      <h2>Account Temporarily Locked</h2>
+      <p>Hello ${username},</p>
+      <p>Your account has been temporarily locked due to multiple failed login attempts.</p>
+      
+      <h3>Details:</h3>
+      <ul>
+        <li><strong>IP Address:</strong> ${ipAddress}</li>
+        <li><strong>Lock Duration:</strong> ${durationMinutes} minutes</li>
+        <li><strong>Unlock Time:</strong> ${new Date(Date.now() + durationMinutes * 60000).toLocaleString()}</li>
+      </ul>
+      
+      <p><strong>If this wasn't you:</strong> Please contact support immediately.</p>
+      <p>Your account will automatically unlock in ${durationMinutes} minutes.</p>
+      
+      <p>Best regards,<br>Security Team</p>
+    `;
+
+    await this.sendEmail(email, subject, html);
+  }
 }

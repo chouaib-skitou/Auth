@@ -37,6 +37,15 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   emailVerifiedAt: Date;
 
+  @Column({ default: 0 })
+  failedLoginAttempts: number;
+
+  @Column({ default: false })
+  isLocked: boolean;
+
+  @Column({ nullable: true })
+  lockedUntil: Date;
+
   @ApiProperty({ description: 'User roles' })
   @ManyToMany(() => Role, (role) => role.users)
   @JoinTable({
