@@ -21,6 +21,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import * as crypto from 'crypto';
+import { AccountLockoutService } from './account-lockout.service';
 
 @Injectable()
 export class AuthService {
@@ -36,9 +37,10 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailService: MailService,
+    private accountLockoutService: AccountLockoutService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto, ipAddress: string): Promise<AuthResponseDto> {
     const user = await this.usersRepository.findOne({
       where: { email: loginDto.email },
       relations: ['roles', 'roles.permissions'],
@@ -48,13 +50,36 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const accountStatus = await this.accountLockoutService.checkAccountStatus(
+      user.id,
+    );
+
+    if (accountStatus.isLocked) {
+      throw new UnauthorizedException(
+        `Account is locked until ${accountStatus.lockedUntil?.toLocaleString()}. Please try again later.`,
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
       user.password,
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      const result = await this.accountLockoutService.recordFailedAttempt(
+        user.id,
+        ipAddress,
+      );
+
+      if (result.isLocked) {
+        throw new UnauthorizedException(
+          `Too many failed attempts. Account locked until ${result.lockedUntil?.toLocaleString()}.`,
+        );
+      }
+
+      throw new UnauthorizedException(
+        `Invalid credentials. ${result.remainingAttempts} attempt(s) remaining.`,
+      );
     }
 
     if (!user.isEmailVerified) {
@@ -62,6 +87,11 @@ export class AuthService {
         'Please verify your email before logging in',
       );
     }
+
+    await this.accountLockoutService.recordSuccessfulAttempt(
+      user.id,
+      ipAddress,
+    );
 
     return this.generateTokens(user);
   }

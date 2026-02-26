@@ -29,6 +29,8 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
+import { Throttle } from '@nestjs/throttler';
+import { Ip } from '@nestjs/common';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -38,6 +40,7 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
@@ -47,8 +50,11 @@ export class AuthController {
     type: AuthResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Ip() ipAddress: string,
+  ): Promise<AuthResponseDto> {
+    return this.authService.login(loginDto, ipAddress || 'unknown');
   }
 
   @Post('refresh')

@@ -1,17 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from '../users/entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
-import { MailModule } from '../mail/mail.module';
-import jwtConfig from '../config/jwt.config';
-import { PassportModule } from '@nestjs/passport';
+import { LoginAttempt } from './entities/login-attempt.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { MailModule } from '../mail/mail.module';
+import { AccountLockoutService } from './account-lockout.service';
+import { AccountLockoutListener } from './account-lockout.listener';
 
 @Module({
   imports: [
@@ -20,14 +22,27 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       RefreshToken,
       EmailVerificationToken,
       PasswordResetToken,
+      LoginAttempt,
     ]),
-    JwtModule.register({}),
     PassportModule,
-    ConfigModule.forFeature(jwtConfig),
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('jwt.accessSecret'),
+        signOptions: {
+          expiresIn: configService.get<string>('jwt.accessExpiration'),
+        },
+      }),
+    }),
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    AccountLockoutService,
+    AccountLockoutListener,
+  ],
+  exports: [AuthService, AccountLockoutService],
 })
 export class AuthModule {}
