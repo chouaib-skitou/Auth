@@ -25,6 +25,8 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  app.set('trust proxy', 1);
+
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
 
