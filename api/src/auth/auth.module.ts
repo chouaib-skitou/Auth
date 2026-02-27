@@ -27,24 +27,12 @@ import { AccountLockoutListener } from './account-lockout.listener';
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const secret = configService.get<string>('jwt.accessSecret');
-        const expiresIn = configService.get<string>('jwt.accessExpiration');
-        
-        if (!secret) {
-          throw new Error('JWT access secret is not configured');
-        }
-        
-        const signOptions: JwtSignOptions = {};
-        if (expiresIn) {
-          signOptions.expiresIn = expiresIn;
-        }
-        
-        return {
-          secret,
-          signOptions,
-        };
-      },
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('jwt.accessSecret'),
+        signOptions: {
+          expiresIn: configService.get('jwt.accessExpiration') as any,
+        },
+      }),
     }),
     MailModule,
   ],
